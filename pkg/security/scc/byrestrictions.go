@@ -22,7 +22,7 @@ func pointValue(constraint *kapi.SecurityContextConstraints) int {
 
 	// make sure these are always valued higher than the combination of the highest strategies
 	if constraint.AllowPrivilegedContainer {
-		points += 20
+		points += 200000
 	}
 
 	// add points based on volume requests
@@ -31,28 +31,28 @@ func pointValue(constraint *kapi.SecurityContextConstraints) int {
 	// strategies in order of least restrictive to most restrictive
 	switch constraint.SELinuxContext.Type {
 	case kapi.SELinuxStrategyRunAsAny:
-		points += 4
+		points += 40000
 	case kapi.SELinuxStrategyMustRunAs:
-		points += 1
+		points += 10000
 	}
 
 	switch constraint.RunAsUser.Type {
 	case kapi.RunAsUserStrategyRunAsAny:
-		points += 4
+		points += 40000
 	case kapi.RunAsUserStrategyMustRunAsNonRoot:
-		points += 3
+		points += 30000
 	case kapi.RunAsUserStrategyMustRunAsRange:
-		points += 2
+		points += 20000
 	case kapi.RunAsUserStrategyMustRunAs:
-		points += 1
+		points += 10000
 	}
 	return points
 }
 
 // volumePointValue returns a score based on the volumes allowed by the SCC.
-// Allowing a host volume will return a score of 10.  Allowance of anything other
+// Allowing a host volume will return a score of 10000.  Allowance of anything other
 // than Secret, ConfigMap, EmptyDir, DownwardAPI, Projected, and None will result in
-// a score of 5.  If the SCC only allows these trivial types, it will have a
+// a score of 5000.  If the SCC only allows these trivial types, it will have a
 // score of 0.
 func volumePointValue(scc *kapi.SecurityContextConstraints) int {
 	hasHostVolume := false
@@ -75,10 +75,10 @@ func volumePointValue(scc *kapi.SecurityContextConstraints) int {
 	}
 
 	if hasHostVolume {
-		return 10
+		return 10000
 	}
 	if hasNonTrivialVolume {
-		return 5
+		return 5000
 	}
 	return 0
 }
