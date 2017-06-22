@@ -1,6 +1,7 @@
 package scc
 
 import (
+	kapi "k8s.io/kubernetes/pkg/api"
 	securityapi "github.com/openshift/origin/pkg/security/apis/security"
 )
 
@@ -27,6 +28,9 @@ func pointValue(constraint *securityapi.SecurityContextConstraints) int {
 
 	// add points based on volume requests
 	points += volumePointValue(constraint)
+
+	// add points based on capabilities
+	points += capabilitiesPointValue(constraint)
 
 	// strategies in order of least restrictive to most restrictive
 	switch constraint.SELinuxContext.Type {
@@ -81,4 +85,40 @@ func volumePointValue(scc *securityapi.SecurityContextConstraints) int {
 		return 50000
 	}
 	return 0
+}
+
+// hasCap checks for needle in haystack.
+func hasCap(needle kapi.Capability, haystack []kapi.Capability) bool {
+	for _, c := range haystack {
+		if needle == c {
+			return true
+		}
+	}
+	return false
+}
+
+// capabilitiesPointValue returns a score based on the capabilities allowed,
+// added, or removed by the SCC. This allow us to prefer the more restrictive
+// SCC.
+func capabilitiesPointValue(scc *securityapi.SecurityContextConstraints) int {
+	points := 5000
+	points += 300 * len(scc.DefaultAddCapabilities)
+	if hasCap(kapi.CapabilityAll, scc.AllowedCapabilities) {
+		points += 4000
+	} else if hasCap("ALL", scc.AllowedCapabilities) {
+		points += 4000
+	} else {
+		points += 10 * len(scc.AllowedCapabilities)
+	}
+	if hasCap("ALL", scc.RequiredDropCapabilities) {
+		points -= 3000
+	} else {
+		points -= 50 * len(scc.RequiredDropCapabilities)
+	}
+	if (points > 10000) {
+		return 10000
+	} else if (points < 0) {
+		return 0
+	}
+	return points
 }
