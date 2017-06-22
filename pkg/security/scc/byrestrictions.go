@@ -28,6 +28,9 @@ func pointValue(constraint *kapi.SecurityContextConstraints) int {
 	// add points based on volume requests
 	points += volumePointValue(constraint)
 
+	// add points based on capabilities
+	points += capabilitiesPointValue(constraint)
+
 	// strategies in order of least restrictive to most restrictive
 	switch constraint.SELinuxContext.Type {
 	case kapi.SELinuxStrategyRunAsAny:
@@ -81,4 +84,34 @@ func volumePointValue(scc *kapi.SecurityContextConstraints) int {
 		return 50000
 	}
 	return 0
+}
+
+// hasCap checks for needle in haystack.
+func hasCap(needle kapi.Capability, haystack []kapi.Capability) bool {
+	for _, c := range haystack {
+		if needle == c {
+			return true
+		}
+	}
+	return false
+}
+
+// capabilitiesPointValue returns a score based on the capabilities allowed,
+// added, or removed by the SCC.
+func capabilitiesPointValue(scc *kapi.SecurityContextConstraints) int {
+	points := 500
+	points += 30 * len(scc.DefaultAddCapabilities)
+	if hasCap(kapi.CapabilityAll, scc.AllowedCapabilities) {
+		points += 300
+	} else {
+		points += 10 * len(scc.AllowedCapabilities)
+	}
+	points -= 50 * len(scc.RequiredDropCapabilities)
+	if (points > 1000) {
+		return 1000
+	} else if (points < 0) {
+		return 0
+	} else {
+		return points
+	}
 }

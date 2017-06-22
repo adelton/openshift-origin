@@ -39,7 +39,7 @@ func TestPointValue(t *testing.T) {
 	// run through all combos of user strategy + seLinux strategy + priv
 	for userStrategy, userStrategyPoints := range userStrategies {
 		for seLinuxStrategy, seLinuxStrategyPoints := range seLinuxStrategies {
-			expectedPoints := privilegedPoints + userStrategyPoints + seLinuxStrategyPoints
+			expectedPoints := 500 + privilegedPoints + userStrategyPoints + seLinuxStrategyPoints
 			scc := newSCC(true, seLinuxStrategy, userStrategy)
 			actualPoints := pointValue(scc)
 
@@ -47,7 +47,7 @@ func TestPointValue(t *testing.T) {
 				t.Errorf("privileged, user: %v, seLinux %v expected %d score but got %d", userStrategy, seLinuxStrategy, expectedPoints, actualPoints)
 			}
 
-			expectedPoints = userStrategyPoints + seLinuxStrategyPoints
+			expectedPoints = 500 + userStrategyPoints + seLinuxStrategyPoints
 			scc = newSCC(false, seLinuxStrategy, userStrategy)
 			actualPoints = pointValue(scc)
 
@@ -57,12 +57,13 @@ func TestPointValue(t *testing.T) {
 		}
 	}
 
-	// sanity check to ensure volume score is added (specific volumes scores are tested below
+	// sanity check to ensure volume and capabilities scores are added (specific volumes
+	// and capabilities scores are tested below
 	scc := newSCC(false, kapi.SELinuxStrategyMustRunAs, kapi.RunAsUserStrategyMustRunAs)
 	scc.Volumes = []kapi.FSType{kapi.FSTypeHostPath}
 	actualPoints := pointValue(scc)
-	if actualPoints != 120000 { //10000 (SELinux) + 10000 (User) + 100000 (host path volume)
-		t.Errorf("volume score was not added to the scc point value correctly!")
+	if actualPoints != 120500 { //10000 (SELinux) + 10000 (User) + 100000 (host path volume) + 500 capabilities
+		t.Errorf("volume score was not added to the scc point value correctly, got %d!", actualPoints)
 	}
 }
 
@@ -169,6 +170,60 @@ func TestVolumePointValue(t *testing.T) {
 		actualPoints := volumePointValue(v.scc)
 		if actualPoints != v.expectedPoints {
 			t.Errorf("%s expected %d volume score but got %d", k, v.expectedPoints, actualPoints)
+		}
+	}
+}
+
+func TestCapabilitiesPointValue(t *testing.T) {
+	newSCC := func(def []kapi.Capability, allow []kapi.Capability, drop []kapi.Capability) *kapi.SecurityContextConstraints {
+		return &kapi.SecurityContextConstraints{
+			DefaultAddCapabilities: def,
+			AllowedCapabilities: allow,
+			RequiredDropCapabilities: drop,
+		}
+	}
+
+	tests := map[string]struct {
+		scc            *kapi.SecurityContextConstraints
+		expectedPoints int
+	}{
+		"nothing specified": {
+			scc:            newSCC([]kapi.Capability{}, []kapi.Capability{}, []kapi.Capability{}),
+			expectedPoints: 500,
+		},
+		"default": {
+			scc:            newSCC([]kapi.Capability{"KILL", "MKNOD"},
+						[]kapi.Capability{},
+						[]kapi.Capability{}),
+			expectedPoints: 560,
+		},
+		"allow": {
+			scc:            newSCC([]kapi.Capability{},
+						[]kapi.Capability{"KILL", "MKNOD"},
+						[]kapi.Capability{}),
+			expectedPoints: 520,
+		},
+		"allow all": {
+			scc:            newSCC([]kapi.Capability{}, []kapi.Capability{"*"}, []kapi.Capability{}),
+			expectedPoints: 800,
+		},
+		"drop": {
+			scc:            newSCC([]kapi.Capability{},
+						[]kapi.Capability{},
+						[]kapi.Capability{"KILL", "MKNOD"}),
+			expectedPoints: 400,
+		},
+		"mixture": {
+			scc:            newSCC([]kapi.Capability{"SETUID", "SETGID"},
+						[]kapi.Capability{"*"},
+						[]kapi.Capability{"SYS_CHROOT"}),
+			expectedPoints: 810,
+		},
+	}
+	for k, v := range tests {
+		actualPoints := capabilitiesPointValue(v.scc)
+		if actualPoints != v.expectedPoints {
+			t.Errorf("%s expected %d capability score but got %d", k, v.expectedPoints, actualPoints)
 		}
 	}
 }
