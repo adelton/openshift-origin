@@ -6,6 +6,7 @@ source "$(dirname "${BASH_SOURCE}")/lib/init.sh"
 
 os::test::junit::declare_suite_start 'tools'
 
+os::cmd::expect_success 'hack/build-go.sh tools/junitreport'
 os::cmd::expect_success 'tools/junitreport/test/integration.sh'
 
 echo "test-tools: ok"
