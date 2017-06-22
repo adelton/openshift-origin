@@ -24,17 +24,17 @@ func TestPointValue(t *testing.T) {
 	}
 
 	seLinuxStrategies := map[securityapi.SELinuxContextStrategyType]int{
-		securityapi.SELinuxStrategyRunAsAny:  4,
-		securityapi.SELinuxStrategyMustRunAs: 1,
+		securityapi.SELinuxStrategyRunAsAny:  40000,
+		securityapi.SELinuxStrategyMustRunAs: 10000,
 	}
 	userStrategies := map[securityapi.RunAsUserStrategyType]int{
-		securityapi.RunAsUserStrategyRunAsAny:         4,
-		securityapi.RunAsUserStrategyMustRunAsNonRoot: 3,
-		securityapi.RunAsUserStrategyMustRunAsRange:   2,
-		securityapi.RunAsUserStrategyMustRunAs:        1,
+		securityapi.RunAsUserStrategyRunAsAny:         40000,
+		securityapi.RunAsUserStrategyMustRunAsNonRoot: 30000,
+		securityapi.RunAsUserStrategyMustRunAsRange:   20000,
+		securityapi.RunAsUserStrategyMustRunAs:        10000,
 	}
 
-	privilegedPoints := 20
+	privilegedPoints := 200000
 
 	// run through all combos of user strategy + seLinux strategy + priv
 	for userStrategy, userStrategyPoints := range userStrategies {
@@ -61,7 +61,7 @@ func TestPointValue(t *testing.T) {
 	scc := newSCC(false, securityapi.SELinuxStrategyMustRunAs, securityapi.RunAsUserStrategyMustRunAs)
 	scc.Volumes = []securityapi.FSType{securityapi.FSTypeHostPath}
 	actualPoints := pointValue(scc)
-	if actualPoints != 12 { //1 (SELinux) + 1 (User) + 10 (host path volume)
+	if actualPoints != 120000 { //10000 (SELinux) + 10000 (User) + 100000 (host path volume)
 		t.Errorf("volume score was not added to the scc point value correctly!")
 	}
 }
@@ -94,27 +94,27 @@ func TestVolumePointValue(t *testing.T) {
 	}{
 		"all volumes": {
 			scc:            allowAllSCC,
-			expectedPoints: 10,
+			expectedPoints: 100000,
 		},
 		"host volume": {
 			scc:            newSCC(true, false, false),
-			expectedPoints: 10,
+			expectedPoints: 100000,
 		},
 		"host volume and non trivial volumes": {
 			scc:            newSCC(true, true, false),
-			expectedPoints: 10,
+			expectedPoints: 100000,
 		},
 		"host volume, non trivial, and trivial": {
 			scc:            newSCC(true, true, true),
-			expectedPoints: 10,
+			expectedPoints: 100000,
 		},
 		"non trivial": {
 			scc:            newSCC(false, true, false),
-			expectedPoints: 5,
+			expectedPoints: 50000,
 		},
 		"non trivial and trivial": {
 			scc:            newSCC(false, true, true),
-			expectedPoints: 5,
+			expectedPoints: 50000,
 		},
 		"trivial": {
 			scc:            newSCC(false, false, true),
